@@ -1,18 +1,21 @@
+extern crate failure;
 extern crate kuchiki;
 extern crate reqwest;
-extern crate failure;
 
-use kuchiki::traits::*;
 use failure::Error;
+use kuchiki::traits::*;
 
 pub struct Actress {
     pub birthdate: String,
 }
 
-pub fn find(actress: &str) -> Result<Actress, Error> {
-    let url = grab_search(actress)?.unwrap();
+pub fn find(actress: &str) -> Result<Option<Actress>, Error> {
+    let url = match grab_search(actress)? {
+        Some(v) => v,
+        None => return Ok(None),
+    };
     let res = reqwest::get(&url)?.text()?;
-    parse_actress(&res)
+    Ok(Some(parse_actress(&res)?))
 }
 
 fn parse_actress(html: &str) -> Result<Actress, Error> {
@@ -52,6 +55,11 @@ fn grab_search(actress: &str) -> Result<Option<String>, Error> {
         actress
     );
     let res = reqwest::get(&url)?.text()?;
+
+    if res.contains("No results found.") {
+        return Ok(None);
+    }
+
     let doc = kuchiki::parse_html().one(res);
     let redirect = doc
         .select_first(".result_block .result_title a")
@@ -74,6 +82,11 @@ mod tests {
 
     #[test]
     fn test_find() {
-        assert_eq!(find("ren mitsuki").unwrap().birthdate, "10/29/93");
+        assert_eq!(find("ren mitsuki").unwrap().unwrap().birthdate, "10/29/93");
+    }
+
+    #[test]
+    fn test_find_fail_safely() {
+        assert!(find("will never match").unwrap().is_none());
     }
 }
