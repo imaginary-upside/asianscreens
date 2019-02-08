@@ -10,10 +10,14 @@ pub struct Actress {
 }
 
 pub fn find(actress: &str) -> Result<Option<Actress>, Error> {
-    let url = match grab_search(actress)? {
-        Some(v) => v,
-        None => return Ok(None),
-    };
+    //let url = match grab_search(actress)? {
+    //    Some(v) => v,
+    //    None => return Ok(None),
+    //};
+    let url = format!(
+        "https://www.asianscreens.com/{}2.asp",
+        actress.replace(" ", "_")
+    );
     let res = reqwest::get(&url)?.text()?;
     Ok(parse_actress(&res)?)
 }
@@ -49,34 +53,6 @@ fn find_row_value(html: &str, key: &str) -> Result<String, Error> {
     }
 
     return Ok("".to_string());
-}
-
-fn grab_search(actress: &str) -> Result<Option<String>, Error> {
-    let url = format!(
-        "https://www.asianscreens.com/search/index.asp?\
-         zoom_sort=0&zoom_query=%22{}%22&zoom_per_page=10&zoom_and=0",
-        actress
-    );
-    let res = reqwest::get(&url)?.text()?;
-
-    if res.contains("No results found.") {
-        return Ok(None);
-    }
-
-    let doc = kuchiki::parse_html().one(res);
-    let redirect = doc
-        .select_first(".result_block .result_title a")
-        .unwrap()
-        .to_owned()
-        .as_node()
-        .as_element()
-        .unwrap()
-        .attributes
-        .borrow()
-        .get("href")
-        .map(|v| v.to_string());
-
-    Ok(redirect)
 }
 
 fn convert_date(original: &str) -> Option<String> {
