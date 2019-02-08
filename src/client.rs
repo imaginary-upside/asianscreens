@@ -15,15 +15,18 @@ pub fn find(actress: &str) -> Result<Option<Actress>, Error> {
         None => return Ok(None),
     };
     let res = reqwest::get(&url)?.text()?;
-    Ok(Some(parse_actress(&res)?))
+    Ok(parse_actress(&res)?)
 }
 
-fn parse_actress(html: &str) -> Result<Actress, Error> {
-    let birthdate = find_row_value(html, "DOB:")?;
+fn parse_actress(html: &str) -> Result<Option<Actress>, Error> {
+    let birthdate = match convert_date(&find_row_value(html, "DOB:")?) {
+        Some(v) => v,
+        None => return Ok(None),
+    };
 
-    Ok(Actress {
+    Ok(Some(Actress {
         birthdate: birthdate,
-    })
+    }))
 }
 
 fn find_row_value(html: &str, key: &str) -> Result<String, Error> {
@@ -76,13 +79,29 @@ fn grab_search(actress: &str) -> Result<Option<String>, Error> {
     Ok(redirect)
 }
 
+fn convert_date(original: &str) -> Option<String> {
+    let mut split = original.split("/");
+    let month = split.next()?;
+    let day = split.next()?;
+    let year = match split.next()?.parse::<i8>().ok()? {
+        v if v >= 20 => format!("19{}", v),
+        v if v < 20 => format!("20{}", v),
+        _ => return None,
+    };
+
+    Some(format!("{}-{}-{}", year, month, day))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_find() {
-        assert_eq!(find("ren mitsuki").unwrap().unwrap().birthdate, "10/29/93");
+        assert_eq!(
+            find("ren mitsuki").unwrap().unwrap().birthdate,
+            "1993-10-29"
+        );
     }
 
     #[test]
