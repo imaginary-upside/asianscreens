@@ -6,24 +6,28 @@ use failure::Error;
 use kuchiki::traits::*;
 
 pub struct Actress {
-    pub birthdate: String,
+    pub birthdate: Option<String>,
 }
 
 pub fn find(actress: &str) -> Result<Option<Actress>, Error> {
-    //let url = match grab_search(actress)? {
-    //    Some(v) => v,
-    //    None => return Ok(None),
-    //};
-    let url = format!(
+    let mut res = reqwest::get(&create_actress_url(actress))?;
+    if !res.status().is_success() {
+        let mut split: Vec<&str> = actress.split(" ").collect();
+        split.reverse();
+        res = reqwest::get(&create_actress_url(&split.join(" ")))?;
+    }
+    Ok(parse_actress(&res.text()?)?)
+}
+
+fn create_actress_url(actress: &str) -> String {
+    format!(
         "https://www.asianscreens.com/{}2.asp",
-        actress.replace(" ", "_")
-    );
-    let res = reqwest::get(&url)?.text()?;
-    Ok(parse_actress(&res)?)
+        actress.to_lowercase().replace(" ", "_")
+    )
 }
 
 fn parse_actress(html: &str) -> Result<Option<Actress>, Error> {
-    let birthdate = match convert_date(&find_row_value(html, "DOB:")?) {
+    let birthdate = match find_row_value(html, "DOB:")?.map(|v| convert_date(&v)) {
         Some(v) => v,
         None => return Ok(None),
     };
@@ -33,7 +37,7 @@ fn parse_actress(html: &str) -> Result<Option<Actress>, Error> {
     }))
 }
 
-fn find_row_value(html: &str, key: &str) -> Result<String, Error> {
+fn find_row_value(html: &str, key: &str) -> Result<Option<String>, Error> {
     let doc = kuchiki::parse_html().one(html);
     for m in doc.select("tr:nth-child(2) b").unwrap() {
         let key_text = m.text_contents().trim().to_string();
@@ -48,11 +52,17 @@ fn find_row_value(html: &str, key: &str) -> Result<String, Error> {
                 .parent()
                 .unwrap();
             let text = parent.text_contents().trim().to_string();
-            return Ok(text.splitn(2, "\n").nth(1).unwrap().trim().to_string());
+            if text == "n/a" {
+                return Ok(None);
+            } else {
+                return Ok(Some(
+                    text.splitn(2, "\n").nth(1).unwrap().trim().to_string(),
+                ));
+            }
         }
     }
 
-    return Ok("".to_string());
+    return Ok(None);
 }
 
 fn convert_date(original: &str) -> Option<String> {
@@ -75,7 +85,7 @@ mod tests {
     #[test]
     fn test_find() {
         assert_eq!(
-            find("ren mitsuki").unwrap().unwrap().birthdate,
+            find("ren mitsuki").unwrap().unwrap().birthdate.unwrap(),
             "1993-10-29"
         );
     }
@@ -83,5 +93,10 @@ mod tests {
     #[test]
     fn test_find_fail_safely() {
         assert!(find("will never match").unwrap().is_none());
+    }
+
+    #[test]
+    fn test_find_backwards_name() {
+        assert_eq!(find("matsushita saeko").unwrap().unwrap().birthdate.unwrap(), "1990-9-30");
     }
 }

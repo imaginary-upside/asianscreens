@@ -5,6 +5,10 @@ use asianscreens::client;
 fn main() {
     println!(
         "{}",
-        client::find("ren mitsuki").unwrap().unwrap().birthdate
+        client::find("ren mitsuki")
+            .unwrap()
+            .unwrap()
+            .birthdate
+            .unwrap()
     );
 }
