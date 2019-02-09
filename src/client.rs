@@ -67,8 +67,8 @@ fn find_row_value(html: &str, key: &str) -> Result<Option<String>, Error> {
 
 fn convert_date(original: &str) -> Option<String> {
     let mut split = original.split("/");
-    let month = split.next()?;
-    let day = split.next()?;
+    let month = format!("{:0>2}", split.next()?);
+    let day = format!("{:0>2}", split.next()?);
     let year = match split.next()?.parse::<i8>().ok()? {
         v if v >= 20 => format!("19{}", v),
         v if v < 20 => format!("20{}", v),
@@ -97,6 +97,13 @@ mod tests {
 
     #[test]
     fn test_find_backwards_name() {
-        assert_eq!(find("matsushita saeko").unwrap().unwrap().birthdate.unwrap(), "1990-9-30");
+        assert_eq!(
+            find("matsushita saeko")
+                .unwrap()
+                .unwrap()
+                .birthdate
+                .unwrap(),
+            "1990-09-30"
+        );
     }
 }
