@@ -9,20 +9,32 @@ pub struct Actress {
     pub birthdate: Option<String>,
 }
 
-pub fn find(actress: &str) -> Result<Option<Actress>, Error> {
-    let mut res = reqwest::get(&create_actress_url(actress))?;
-    if !res.status().is_success() {
-        let mut split: Vec<&str> = actress.split(" ").collect();
-        split.reverse();
-        res = reqwest::get(&create_actress_url(&split.join(" ")))?;
-    }
-    Ok(parse_actress(&res.text()?)?)
+pub fn find(name: &str) -> Result<Option<Actress>, Error> {
+    recursive_find(name, 2)
 }
 
-fn create_actress_url(actress: &str) -> String {
+fn recursive_find(name: &str, unique: u8) -> Result<Option<Actress>, Error> {
+    let mut res = reqwest::get(&create_actress_url(name, unique))?;
+    if !res.status().is_success() {
+        let mut split: Vec<&str> = name.split(" ").collect();
+        split.reverse();
+        res = reqwest::get(&create_actress_url(&split.join(" "), unique))?;
+    }
+    let actress = match parse_actress(&res.text()?)? {
+        Some(a) => a,
+        None => return Ok(None),
+    };
+    match actress.birthdate {
+        Some(_) => return Ok(Some(actress)),
+        None => return recursive_find(name, unique + 1),
+    };
+}
+
+fn create_actress_url(actress: &str, unique: u8) -> String {
     format!(
-        "https://www.asianscreens.com/{}2.asp",
-        actress.to_lowercase().replace(" ", "_")
+        "https://www.asianscreens.com/{}{}.asp",
+        actress.to_lowercase().replace(" ", "_"),
+        unique
     )
 }
 
@@ -104,6 +116,14 @@ mod tests {
                 .birthdate
                 .unwrap(),
             "1990-09-30"
+        );
+    }
+
+    #[test]
+    fn test_find_duplicate_name() {
+        assert_eq!(
+            find("kaori").unwrap().unwrap().birthdate.unwrap(),
+            "1975-05-08"
         );
     }
 }
